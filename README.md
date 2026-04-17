@@ -30,6 +30,16 @@ This project is a serverless backend system built using AWS services. It allows 
 **POST Request URL:**
 https://tu39at1jyk.execute-api.ap-south-1.amazonaws.com/upload
 
+## Screenshots
+
+### Environment Variables
+![Env](docs/env-variables.png)
+
+### API Test Success
+![Postman](docs/postman-success.png)
+
+### CloudWatch Logs
+![Logs](docs/cloudwatch-logs.png)
 
 
 Body:

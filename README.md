@@ -65,36 +65,6 @@ Headers:
 
 Authorization: Bearer JWT_TOKEN
 
-Body:
-
-```json
-{
-  "file": "Hello World",
-  "file_name": "test.txt"
-}
-
-
-
-Screenshots
-
-Environment Variables
-env.png
-
-API Test Success
-Postman
-post1.png
-post2.png
-post3.png
-post4.png
-
-Response
-response.png
-CloudWatch Logs
-cloudwatch-logs.png
-cloudwatch-log2.png
-
-Architecture Diagram
-Architecture.png
 Security
 
 IAM role is configured with least privilege access:

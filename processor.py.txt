@@ -1,0 +1,37 @@
+import json
+import boto3
+import os
+import uuid
+from datetime import datetime
+
+# Initialize DynamoDB resource
+dynamodb = boto3.resource('dynamodb')
+TABLE_NAME = os.environ.get('TABLE_NAME')
+table = dynamodb.Table(TABLE_NAME)
+
+def lambda_handler(event, context):
+    # SQS sends messages in a list called 'Records'
+    for record in event['Records']:
+        try:
+            # 1. Extract the data from the SQS message body
+            message_body = json.loads(record['body'])
+            
+            # 2. Save metadata to DynamoDB
+            # We add a unique ID and a timestamp for production tracking
+            table.put_item(
+                Item={
+                    'file_id': str(uuid.uuid4()),
+                    'file_name': message_body['file_name'],
+                    'file_size': message_body['file_size'],
+                    'processed_at': datetime.now().isoformat(),
+                    'status': 'COMPLETED'
+                }
+            )
+            print(f"Processed file: {message_body['file_name']}")
+            
+        except Exception as e:
+            print(f"Failed to process record: {str(e)}")
+            # If this fails, the SQS DLQ (Dead Letter Queue) will eventually catch it
+            raise e 
+
+    return {'status': 'SUCCESS'}

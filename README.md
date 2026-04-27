@@ -68,5 +68,4 @@ sam deploy --guided
 │   └── processor.py      # Processes queue & updates DynamoDB
 ├── template.yaml         # SAM Infrastructure Template (MANDATORY)
 ├── docs/                 # Evidence of deployment & JWT decoding
-└── postman/              # Exported Postman Collection
 ```

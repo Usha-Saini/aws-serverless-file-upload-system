@@ -1,0 +1,45 @@
+import json
+import boto3
+import os
+
+# Initialize the SQS client
+sqs = boto3.client('sqs')
+# This gets the Queue URL from your template.yaml settings
+QUEUE_URL = os.environ.get('QUEUE_URL')
+
+def lambda_handler(event, context):
+    try:
+        # 1. Parse the incoming request body
+        body = json.loads(event.get('body', '{}'))
+        file_name = body.get('file_name', 'unknown_file')
+        file_size = body.get('file_size', 0)
+
+        # 2. Production Requirement: File Validation (Size check)
+        # Limit set to 5MB (5242880 bytes)
+        if file_size > 5242880:
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'File exceeds 5MB limit.'})
+            }
+
+        # 3. Async Processing: Send metadata to SQS
+        # This decouples the upload from the database processing
+        payload = {
+            'file_name': file_name,
+            'file_size': file_size,
+            'event': 'FILE_UPLOADED'
+        }
+        
+        sqs.send_message(
+            QueueUrl=QUEUE_URL,
+            MessageBody=json.dumps(payload)
+        )
+
+        return {
+            'statusCode': 200,
+            'headers': {'Content-Type': 'application/json'},
+            'body': json.dumps({'message': 'Success! Message queued for processing.'})
+        }
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return {'statusCode': 500, 'body': json.dumps({'error': 'Internal Server Error'})}

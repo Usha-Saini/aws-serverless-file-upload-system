@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Production-ready backend for file upload tasks.
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 128
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+  # 1. THE API (Requirement #7 - Rate Limiting & Auth)
+  MyServerlessApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      # Requirement #7: Throttling / Rate Limiting via MethodSettings
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          ThrottlingBurstLimit: 100
+          ThrottlingRateLimit: 50
+      Auth:
+        DefaultAuthorizer: MyCognitoAuthorizer
+        Authorizers:
+          MyCognitoAuthorizer:
+            UserPoolArn: !GetAtt MyCognitoUserPool.Arn
+
+  # 2. Metadata Storage (Requirement #5)
+  FileMetadataTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: file_id
+        Type: String
+
+  # 3. Queues (Requirement #2 & #4)
+  MyDeadLetterQueue:
+    Type: AWS::SQS::Queue
+
+  MyProcessingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt MyDeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  # 4. Storage Bucket
+  UserUploadBucket:
+    Type: AWS::S3::Bucket
+
+  # 5. Producer Lambda
+  UploadProducerFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: hello_world/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      Events:
+        UploadApi:
+          Type: Api 
+          Properties:
+            Path: /upload
+            Method: post
+            RestApiId: !Ref MyServerlessApi
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref FileMetadataTable
+          QUEUE_URL: !Ref MyProcessingQueue
+      Policies:
+        - DynamoDBCrudPolicy: {TableName: !Ref FileMetadataTable}
+        - SQSSendMessagePolicy: {QueueName: !GetAtt MyProcessingQueue.QueueName}
+
+  # 6. Cognito User Pool (Requirement #1)
+  MyCognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}-UserPool"
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      AutoVerifiedAttributes:
+        - email
+
+  # 7. Cognito Client (For Postman)
+  MyCognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref MyCognitoUserPool
+      ClientName: !Sub "${AWS::StackName}-Client"
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+        - USER_PASSWORD_AUTH
+
+  # Monitoring Setup (Requirement #8)
+  ApplicationResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name: !Sub "ApplicationInsights-SAM-${AWS::StackName}"
+      ResourceQuery:
+        Type: CLOUDFORMATION_STACK_1_0
+
+  ApplicationInsightsMonitoring:
+    Type: AWS::ApplicationInsights::Application
+    Properties:
+      ResourceGroupName: !Ref ApplicationResourceGroup
+      AutoConfigurationEnabled: 'true'
+
+Outputs:
+  WebEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${MyServerlessApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/upload/"
+  UserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref MyCognitoUserPool
+  ClientId:
+    Description: "Cognito Client ID"
+    Value: !Ref MyCognitoUserPoolClient

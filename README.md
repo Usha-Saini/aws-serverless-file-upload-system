@@ -1,93 +1,72 @@
-# AWS Production Ready Serverless File Upload System
+# AWS Production-Ready Serverless File Processing System
 
-## Overview
+## 🚀 Overview
+This repository contains a high-availability, asynchronous backend system built with **AWS Serverless Application Model (SAM)**. It addresses the core pillars of the AWS Well-Architected Framework: Security, Reliability, and Performance Efficiency.
 
-This project is an upgraded serverless backend system built using AWS services. It allows users to securely upload files using an API. Files are authenticated using JWT tokens, validated, stored in Amazon S3, processed asynchronously using AWS Lambda and Amazon SQS, and metadata is stored in DynamoDB.
-
-This upgraded version focuses on security, scalability, reliability, and monitoring.
-
----
-
-## Services Used
-
-API Gateway  
-AWS Lambda  
-Amazon S3  
-DynamoDB  
-Amazon SQS  
-Dead Letter Queue (DLQ)  
-Amazon Cognito  
-CloudWatch  
-AWS SAM  
+The system migrates a basic file-upload utility into a robust pipeline featuring **JWT Authentication**, **Queue-based Decoupling**, and **Automated Metadata Persistence**.
 
 ---
 
-## Architecture Diagram
+## 🏗️ Architecture
+The system follows a non-blocking, asynchronous pattern to ensure the API remains responsive even during high traffic bursts.
 
-Architecture
 
----
 
-## Working Flow
-
-User sends a POST request using API Gateway with JWT token  
-API Gateway validates token using Cognito  
-Rate limiting is applied on API requests  
-API Gateway triggers Upload Lambda  
-Lambda validates file type and size  
-Lambda uploads file to S3  
-Lambda stores metadata in DynamoDB  
-Lambda sends message to SQS queue  
-Processor Lambda reads message from SQS  
-File is processed asynchronously  
-If processing fails, message goes to DLQ after retries  
-Logs and metrics are stored in CloudWatch  
+### **The Workflow:**
+1.  **Authentication:** Users authenticate via **Amazon Cognito** to obtain a JWT IdToken.
+2.  **Traffic Control:** **API Gateway** enforces Rate Limiting (Throttling) and validates the JWT.
+3.  **Validation & Ingestion:** The `Uploader Lambda` validates file constraints (type/size) and pushes a message to **Amazon SQS**.
+4.  **Async Processing:** The `Processor Lambda` consumes messages from the queue to handle heavy tasks without slowing down the user.
+5.  **Persistence:** Metadata (File name, size, user, timestamp) is committed to **Amazon DynamoDB**.
+6.  **Fault Tolerance:** Failed executions are routed to a **Dead Letter Queue (DLQ)** for inspection and retry logic.
 
 ---
 
-## Environment Variables
-
-Environment Variables
-
-BUCKET_NAME: my-file-upload-bucket-system  
-TABLE_NAME: FileMetadatafix  
-QUEUE_URL: file-processing-queue  
-MAX_FILE_SIZE: 5242880  
-USER_POOL_ID: ap-south-1_xxxxx  
+## 🛠️ Tech Stack & Services
+* **Infrastructure as Code:** AWS SAM (CloudFormation)
+* **Identity Provider:** Amazon Cognito (JWT)
+* **Compute:** AWS Lambda (Python 3.9+)
+* **Messaging:** Amazon SQS (with Redrive Policy/DLQ)
+* **Database:** Amazon DynamoDB (NoSQL)
+* **Storage:** Amazon S3
+* **Observability:** Amazon CloudWatch (Logs & Alarms)
 
 ---
 
-## API Testing (Postman)
+## 🔐 Security & Governance
+* **Authentication:** Integrated JWT verification. Only users with a valid Cognito session can interact with the API.
+* **Authorization:** IAM roles follow the **Principle of Least Privilege**, granting only the specific permissions needed for S3, SQS, and DynamoDB.
+* **Throttling:** API Gateway is configured with rate limits to protect against DDoS and resource exhaustion.
 
-POST Request URL: https://your-api-url.amazonaws.com/prod/upload
+---
 
-Headers:
+## 📊 Monitoring & Reliability
+* **Logging:** Centralized execution logs in **CloudWatch Logs** for end-to-end traceability.
+* **Alerting:** CloudWatch Alarms configured for **Lambda Errors** and **SQS Backlog** depth.
+* **Retry Policy:** SQS is configured with a visibility timeout and a max receive count before moving messages to the **DLQ**.
 
-Authorization: Bearer JWT_TOKEN
+---
 
-Security
+## 🚀 Deployment
+This project is fully managed via **AWS SAM**.
 
-IAM role is configured with least privilege access:
+```bash
+# Build the application
+sam build
 
-S3: PutObject
-DynamoDB: PutItem / UpdateItem
-SQS: SendMessage / ReceiveMessage
-CloudWatch: Logs Write Access
-JWT Authentication Enabled
-API Rate Limiting Enabled
-Monitoring & Reliability
+# Deploy to AWS
+sam deploy --guided
+```
 
-CloudWatch Alarms configured for:
+---
 
-Lambda Errors
-API Failures
-Queue Backlog
-DLQ Messages
-
-SQS Retry mechanism improves fault tolerance.
-Infrastructure as Code
-
-Deployment is managed using AWS SAM.
-Conclusion
-
-This project demonstrates a production-ready, secure, and scalable serverless architecture using AWS. It includes authentication, asynchronous processing, retry handling, monitoring, and Infrastructure as Code for real-world deployments.
+## 📂 Project Structure
+```text
+.
+├── src/
+│   ├── uploader.py       # Validates & pushes to SQS
+│   └── processor.py      # Processes queue & updates DynamoDB
+├── template.yaml         # SAM Infrastructure Template (MANDATORY)
+├── docs/                 # Evidence of deployment & JWT decoding
+└── postman/              # Exported Postman Collection
+```
